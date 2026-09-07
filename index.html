@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Circuit Builder — Clover Studio</title>
+<meta name="description" content="A relaxing puzzle game about wiring real breadboard circuits, from your first LED to logic gates and digital memory.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  /* Deliberate single-theme commitment: this is the game's own "workshop at
+     night" aesthetic (see scripts/palette.gd), not a default-light page that
+     forgot dark mode. Colors are still painted explicitly throughout. */
+  :root {
+    --bg: #1e2530;
+    --surface: #262e3b;
+    --surface-raised: #2d3646;
+    --ink: #e8e3d8;
+    --ink-muted: #a9b0bd;
+    --rule: #3a4353;
+    --accent: #5fbf9a;
+    --accent-soft: #2b3b38;
+    --accent-warm: #f0b94a;
+    --rail-pos: #d9594b;
+    --rail-neg: #3d7bb0;
+    --code-bg: #1a202b;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .wrap {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- header ---------- */
+  header.site {
+    padding: 22px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  header.site .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 14px;
+    letter-spacing: 0.03em;
+    color: var(--ink-muted);
+  }
+  .brand .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+    flex-shrink: 0;
+  }
+  header.site nav {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+  }
+  header.site nav a {
+    color: var(--ink-muted);
+    text-decoration: none;
+  }
+  header.site nav a:hover { color: var(--ink); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 72px 0 64px; }
+  .hero .wrap {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .hero h1 {
+    font-size: clamp(36px, 5.5vw, 56px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 18px;
+  }
+  .hero .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-warm);
+    margin: 0 0 14px;
+  }
+  .hero p.lede {
+    font-size: 18px;
+    color: var(--ink-muted);
+    max-width: 46ch;
+    margin: 0 0 28px;
+  }
+  .hero .cta-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--ink-muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 9px 16px;
+  }
+  .badge-status .pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-warm);
+  }
+  .price-note {
+    font-size: 14px;
+    color: var(--ink-muted);
+  }
+  .price-note strong { color: var(--ink); }
+
+  .hero-art {
+    aspect-ratio: 1 / 1;
+    max-width: 380px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .hero-art svg { width: 100%; height: 100%; display: block; }
+
+  /* ---------- section shell ---------- */
+  section.block { padding: 56px 0; }
+  section.block.alt { background: var(--surface); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .section-head { max-width: 640px; margin: 0 0 40px; }
+  .section-head .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  .section-head h2 {
+    font-size: clamp(26px, 3.6vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 12px;
+  }
+  .section-head p {
+    color: var(--ink-muted);
+    font-size: 16px;
+    margin: 0;
+  }
+
+  /* ---------- curriculum ---------- */
+  .chapters {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--rule);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+  }
+  .chapter {
+    background: var(--surface-raised);
+    padding: 28px 28px;
+    display: grid;
+    grid-template-columns: 84px 1fr auto;
+    gap: 24px;
+    align-items: start;
+  }
+  .chapter .ch-num {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--ink-muted);
+    letter-spacing: 0.04em;
+    padding-top: 3px;
+  }
+  .chapter .ch-num .dot {
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 8px;
+  }
+  .chapter.free .ch-num .dot { background: var(--accent); }
+  .chapter.paid .ch-num .dot { background: var(--accent-warm); }
+  .chapter h3 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 0 0 8px;
+  }
+  .chapter p {
+    color: var(--ink-muted);
+    font-size: 15px;
+    margin: 0 0 10px;
+    max-width: 58ch;
+  }
+  .chapter .parts {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chapter .parts span {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    padding: 3px 8px;
+  }
+  .chapter .tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 11px;
+    border-radius: 999px;
+    white-space: nowrap;
+    height: fit-content;
+  }
+  .chapter.free .tag { color: var(--accent); background: var(--accent-soft); }
+  .chapter.paid .tag { color: var(--accent-warm); background: rgba(240, 185, 74, 0.14); }
+
+  @media (max-width: 700px) {
+    .chapter { grid-template-columns: 1fr; }
+    .chapter .ch-num { display: flex; align-items: center; gap: 8px; padding-top: 0; }
+    .chapter .ch-num .dot { margin-top: 0; }
+    .chapter .tag { justify-self: start; }
+    .hero .wrap { grid-template-columns: 1fr; }
+    .hero-art { order: -1; max-width: 220px; }
+  }
+
+  /* ---------- principles ---------- */
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .principle {
+    padding: 4px 0;
+  }
+  .principle .glyph {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 16px;
+  }
+  .principle h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 8px;
+  }
+  .principle p {
+    color: var(--ink-muted);
+    font-size: 14.5px;
+    margin: 0;
+  }
+  @media (max-width: 700px) {
+    .principles { grid-template-columns: 1fr; gap: 32px; }
+  }
+
+  /* ---------- footer ---------- */
+  footer.site {
+    border-top: 1px solid var(--rule);
+    padding: 32px 0;
+  }
+  footer.site .wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--ink-muted);
+  }
+  footer.site a { color: var(--ink-muted); }
+  footer.site a:hover { color: var(--ink); }
+  footer.site .links { display: flex; gap: 20px; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> CLOVER STUDIO</div>
+    <nav>
+      <a href="#curriculum">Curriculum</a>
+      <a href="#approach">Approach</a>
+      <a href="privacy-policy.html">Privacy</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">A Clover Studio puzzle game</p>
+      <h1>Wire real circuits.<br>Learn how they think.</h1>
+      <p class="lede">Circuit Builder is a breadboard puzzle game where every part behaves like the real thing. No shortcuts, no fail states — just resistors, LEDs, transistors, and eventually the logic gates and memory circuits they add up to.</p>
+      <div class="cta-row">
+        <span class="badge-status"><span class="pulse"></span> Coming soon to Google Play</span>
+        <span class="price-note"><strong>Chapters 1–2 free</strong> · one unlock for the rest</span>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <svg viewBox="0 0 380 380">
+        <rect x="18" y="60" width="344" height="8" rx="4" fill="#d9594b" opacity="0.45"/>
+        <rect x="18" y="312" width="344" height="8" rx="4" fill="#3d7bb0" opacity="0.45"/>
+        <circle cx="190" cy="190" r="118" fill="#5fbf9a" opacity="0.16"/>
+        <line x1="190" y1="90" x2="190" y2="138" stroke="#b8bdc4" stroke-width="7" stroke-linecap="round"/>
+        <line x1="190" y1="242" x2="190" y2="292" stroke="#b8bdc4" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="190" cy="190" r="58" fill="#5fbf9a"/>
+        <circle cx="190" cy="190" r="58" fill="none" stroke="#3f8468" stroke-width="3"/>
+        <circle cx="172" cy="172" r="19" fill="#ffffff" opacity="0.38"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="block alt" id="curriculum">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">The curriculum</p>
+      <h2>Four chapters, one continuous arc</h2>
+      <p>Each level teaches one real idea and hands it straight to the next one. By Chapter 4 you're not doing anything conceptually different from Chapter 1 — you're just doing more of it at once.</p>
+    </div>
+
+    <div class="chapters">
+      <div class="chapter free">
+        <div class="ch-num">CH.01<span class="dot"></span></div>
+        <div>
+          <h3>Basics</h3>
+          <p>Complete a loop, and an LED lights up. Break it anywhere in a series circuit and both LEDs go dark; wire the same two LEDs in parallel instead and each one keeps working independently of the other.</p>
+          <div class="parts"><span>resistor</span><span>LED</span><span>switch</span><span>push button</span></div>
+        </div>
+        <div class="tag">Free</div>
+      </div>
+
+      <div class="chapter free">
+        <div class="ch-num">CH.02<span class="dot"></span></div>
+        <div>
+          <h3>Control &amp; Sensing</h3>
+          <p>Resistance stops being fixed: a potentiometer puts it under your thumb, a photoresistor puts it at the mercy of the light in the room. Then the transistor arrives — a small control current switching a much larger one, the one building block every gate in Chapter 3 is made from.</p>
+          <div class="parts"><span>potentiometer</span><span>photoresistor</span><span>capacitor</span><span>transistor</span></div>
+        </div>
+        <div class="tag">Free</div>
+      </div>
+
+      <div class="chapter paid">
+        <div class="ch-num">CH.03<span class="dot"></span></div>
+        <div>
+          <h3>Logic Foundations</h3>
+          <p>Every gate here is built from the same discrete transistors and resistors you already know, wired into AND, OR, NAND, NOR, and finally XOR — reading two inputs and deciding a single true-or-false answer.</p>
+          <div class="parts"><span>AND</span><span>OR</span><span>NAND</span><span>NOR</span><span>XOR</span></div>
+        </div>
+        <div class="tag">Unlock</div>
+      </div>
+
+      <div class="chapter paid">
+        <div class="ch-num">CH.04<span class="dot"></span></div>
+        <div>
+          <h3>Digital Memory</h3>
+          <p>Two cross-coupled gates that hold a value with nothing but their own feedback loop. From there: a latch that only listens while enabled, a flip-flop that toggles once per pulse, and a half adder that actually adds two bits together.</p>
+          <div class="parts"><span>SR latch</span><span>D latch</span><span>flip-flop</span><span>half adder</span></div>
+        </div>
+        <div class="tag">Unlock</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="approach">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">How it teaches</p>
+      <h2>Built to be relaxing first, correct second</h2>
+    </div>
+
+    <div class="principles">
+      <div class="principle">
+        <svg class="glyph" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="10" fill="none" stroke="#5fbf9a" stroke-width="2.5"/><circle cx="17" cy="17" r="3.5" fill="#5fbf9a"/></svg>
+        <h3>No fail state</h3>
+        <p>Wire it wrong and nothing happens except the circuit staying dark. There's no timer, no lives, no penalty for trying something and watching it not work.</p>
+      </div>
+      <div class="principle">
+        <svg class="glyph" viewBox="0 0 34 34" aria-hidden="true"><rect x="6" y="6" width="22" height="22" rx="3" fill="none" stroke="#f0b94a" stroke-width="2.5"/><path d="M12 17h10M17 12v10" stroke="#f0b94a" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <h3>A hint that never runs out</h3>
+        <p>Stuck is never the end of the road — the hint button walks you to the exact next wire, every time, as many times as you need it.</p>
+      </div>
+      <div class="principle">
+        <svg class="glyph" viewBox="0 0 34 34" aria-hidden="true"><path d="M6 12h22M6 17h22M6 22h14" stroke="#3d7bb0" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <h3>A real schematic, always on hand</h3>
+        <p>Pull down the Blueprint sheet any time to see the standard schematic symbol for what you just built, next to the breadboard version you actually wired.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="wrap">
+    <div>Circuit Builder &middot; Clover Studio</div>
+    <div class="links">
+      <a href="privacy-policy.html">Privacy Policy</a>
+      <a href="mailto:playcloverstudio@gmail.com">playcloverstudio@gmail.com</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
